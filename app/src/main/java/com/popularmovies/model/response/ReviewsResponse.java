@@ -23,7 +23,7 @@ public class ReviewsResponse {
         if (mReviews == null) {
             mReviews = new ArrayList<>();
         }
-        for(Review m: mReviews){
+        for (Review m : mReviews) {
             m.setmId(mId);
         }
         return mReviews;

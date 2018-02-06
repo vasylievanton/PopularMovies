@@ -54,7 +54,7 @@ public class LoadingDialog extends DialogFragment {
         }
 
         @Override
-        public void showLoadingIndicator() {
+        public void showLoadingIndicator(Object o) {
             if (mWaitForHide.compareAndSet(false, true)) {
                 if (mFm.findFragmentByTag(LoadingDialog.class.getName()) == null) {
                     DialogFragment dialog = new LoadingDialog();

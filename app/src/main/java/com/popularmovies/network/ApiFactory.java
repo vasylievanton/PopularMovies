@@ -5,8 +5,9 @@ import android.support.annotation.NonNull;
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
-import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
+
+import com.jakewharton.retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import com.popularmovies.BuildConfig;
 
 
@@ -37,7 +38,7 @@ public final class ApiFactory {
                 .baseUrl(BuildConfig.API_ENDPOINT)
                 .client(getClient())
                 .addConverterFactory(GsonConverterFactory.create())
-                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .build()
                 .create(MovieService.class);
     }

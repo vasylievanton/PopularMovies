@@ -12,6 +12,9 @@ import com.popularmovies.model.content.Video;
 
 public class VideosResponse {
 
+    @SerializedName("id")
+    private int mId;
+
     @SerializedName("results")
     private List<Video> mVideos;
 
@@ -19,6 +22,9 @@ public class VideosResponse {
     public List<Video> getVideos() {
         if (mVideos == null) {
             return new ArrayList<>();
+        }
+        for (Video m : mVideos) {
+            m.setmId(mId);
         }
         return mVideos;
     }

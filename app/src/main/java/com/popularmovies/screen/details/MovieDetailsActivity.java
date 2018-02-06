@@ -2,11 +2,13 @@ package com.popularmovies.screen.details;
 
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.CollapsingToolbarLayout;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.content.ContextCompat;
@@ -19,25 +21,31 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.util.List;
-
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
 import io.realm.Realm;
 import io.realm.RealmResults;
+
 import com.popularmovies.R;
+import com.popularmovies.model.content.CombinedVideoReview;
 import com.popularmovies.model.content.Movie;
 import com.popularmovies.model.content.Review;
 import com.popularmovies.model.content.Video;
 import com.popularmovies.model.response.ReviewsResponse;
+import com.popularmovies.model.response.VideosResponse;
 import com.popularmovies.network.ApiFactory;
 import com.popularmovies.screen.loading.LoadingDialog;
 import com.popularmovies.screen.loading.LoadingView;
 import com.popularmovies.utils.Images;
-import rx.Observable;
-import rx.Subscription;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
+import com.popularmovies.utils.Videos;
+
+import org.reactivestreams.Subscription;
+
 
 public class MovieDetailsActivity extends AppCompatActivity {
 
@@ -67,8 +75,15 @@ public class MovieDetailsActivity extends AppCompatActivity {
     @BindView(R.id.review)
     TextView mReviewTextView;
 
+    @BindView(R.id.video_name)
+    TextView mVideoKeyTextView;
+
     @Nullable
-    private Subscription mMoviesReviewSubscription;
+    private Disposable mMoviesReviewSubscription;
+    @Nullable
+    private Video mVideo;
+    @Nullable
+    private Movie mMovie;
 
     public static void navigate(@NonNull AppCompatActivity activity, @NonNull View transitionImage,
                                 @NonNull Movie movie) {
@@ -77,6 +92,15 @@ public class MovieDetailsActivity extends AppCompatActivity {
 
         ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(activity, transitionImage, IMAGE);
         ActivityCompat.startActivity(activity, intent, options.toBundle());
+    }
+
+
+    private Observable<ReviewsResponse> getReviewsObservable(int id) {
+        return ApiFactory.getMoviesService().movieReviews(id);
+    }
+
+    private Observable<VideosResponse> getVideosObservable(int id) {
+        return ApiFactory.getMoviesService().movieTrailers(id);
     }
 
     @Override
@@ -94,65 +118,50 @@ public class MovieDetailsActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
-
-        Movie movie = getIntent().getParcelableExtra(EXTRA_MOVIE);
-        showMovie(movie);
-
+        mVideoKeyTextView.setPaintFlags(mVideoKeyTextView.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);
+        mMovie = getIntent().getParcelableExtra(EXTRA_MOVIE);
+        showMovie(mMovie);
         LoadingView loadingView = LoadingDialog.view(getSupportFragmentManager());
-        mMoviesReviewSubscription = ApiFactory.getMoviesService()
-                .moviesReview(movie.getId())
-                .map(ReviewsResponse::getReviews)
-                .flatMap(reviews -> {
+        Observable.zip(
+                getReviewsObservable(mMovie.getId()).subscribeOn(Schedulers.newThread()),
+                getVideosObservable(mMovie.getId()).subscribeOn(Schedulers.newThread()),
+                (reviewsResponse, videosResponse) -> {
                     Realm.getDefaultInstance().executeTransaction(realm -> {
-                        realm.insert(reviews);
+                        realm.insertOrUpdate(videosResponse.getVideos());
+                        realm.insertOrUpdate(reviewsResponse.getReviews());
                     });
-                    return Observable.just(reviews);
+                    return new CombinedVideoReview(videosResponse.getVideos(), reviewsResponse.getReviews());
                 })
                 .onErrorResumeNext(throwable -> {
                     Realm realm = Realm.getDefaultInstance();
-                    RealmResults<Review> results = realm.where(Review.class)
-                            .equalTo("id", String.valueOf(movie.getId()))
+                    RealmResults<Review> reviewRealmResults = realm.where(Review.class)
+                            .equalTo("mId", mMovie.getId())
                             .findAll();
-                    return Observable.just(realm.copyFromRealm(results));
+                    RealmResults<Video> videoRealmResults = realm.where(Video.class)
+                            .equalTo("mId", mMovie.getId())
+                            .findAll();
+                    return Observable.just(new CombinedVideoReview(realm.copyFromRealm(videoRealmResults), realm.copyFromRealm(reviewRealmResults)));
                 })
                 .doOnSubscribe(loadingView::showLoadingIndicator)
                 .doAfterTerminate(loadingView::hideLoadingIndicator)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::showReviews, throwable -> showError());
+                .subscribe(this::showCombinedVideoTrailers, this::showError);
+
     }
 
 
     @Override
     protected void onPause() {
         if (mMoviesReviewSubscription != null) {
-            mMoviesReviewSubscription.unsubscribe();
+            mMoviesReviewSubscription.dispose();
         }
         super.onPause();
     }
 
-    private void showError() {
-     //
+    private void showError(Throwable throwable) {
+        Snackbar.make(mRatingTextView, throwable.getMessage(), Snackbar.LENGTH_SHORT);
     }
-
-
-    /**
-         * TODO : task
-         *
-         * Load movie trailers and reviews and display them
-         *
-         * 1) See http://docs.themoviedb.apiary.io/#reference/movies/movieidtranslations/get?console=1
-         * http://docs.themoviedb.apiary.io/#reference/movies/movieidtranslations/get?console=1
-         * for API documentation
-         *
-         * 2) Add requests to {@link com.popularmovies.network.MovieService} for trailers and videos
-         *
-         * 3) Execute requests in parallel and show loading progress until both of them are finished
-         *
-         * 4) Save trailers and videos to Realm and use cached version when error occurred
-         *
-         * 5) Handle lifecycle changes any way you like
-         */
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -192,13 +201,15 @@ public class MovieDetailsActivity extends AppCompatActivity {
         mRatingTextView.setText(getString(R.string.rating, average, MAXIMUM_RATING));
     }
 
-    private void showTrailers(@NonNull List<Video> videos) {
-        // TODO : show trailers
+    private void showCombinedVideoTrailers(@NonNull CombinedVideoReview combinedVideoReview) {
+        mVideo = combinedVideoReview.getVideoList().get(0);
+        mVideoKeyTextView.setText(mVideo.getName());
+        mReviewTextView.setText(combinedVideoReview.getReviewList().get(0).getContent());
     }
 
-    private void showReviews(@NonNull List<Review> reviews) {
-        mRatingTextView.setText(reviews.get(0).getContent());
-        // TODO : show reviews
+    @OnClick(R.id.video_name)
+    public void onVideoPathClick() {
+        assert mVideo != null;
+        Videos.browseVideo(this, mVideo);
     }
-
 }
