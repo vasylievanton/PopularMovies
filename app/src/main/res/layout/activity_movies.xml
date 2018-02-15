@@ -7,33 +7,59 @@
     android:fitsSystemWindows="true"
     tools:context=".screen.movies.MoviesActivity">
 
-    <include layout="@layout/toolbar" />
-
-    <LinearLayout
+    <android.support.design.widget.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" >
+        android:layout_height="wrap_content"
+        android:theme="@style/AppTheme.AppBarOverlay">
 
-        <AutoCompleteTextView
-            android:hint="@string/type_movie"
-            android:textColorHint="@android:color/background_light"
-            android:textColor="@android:color/background_light"
-            android:background="@color/colorPrimary"
-            android:id="@+id/movies_search_il"
+        <android.support.v7.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:background="?attr/colorPrimary"
+            app:layout_scrollFlags="scroll|enterAlways"
+            app:popupTheme="@style/AppTheme.PopupOverlay" />
+
+        <LinearLayout
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:overScrollMode="always"
-            android:padding="16dp"/>
+            android:paddingBottom="8dp"
+            android:paddingEnd="16dp"
+            android:paddingStart="16dp"
+            app:layout_scrollFlags="scroll|enterAlways">
 
-        <android.support.v7.widget.RecyclerView
-            android:id="@+id/recyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:overScrollMode="never" />
 
-    </LinearLayout>
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="0dp"
+                android:src="@drawable/database_search" />
 
+            <AutoCompleteTextView
+                android:maxLines="1"
+                android:id="@+id/movies_search_il"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/colorPrimary"
+                android:gravity="center_vertical"
+                android:hint="@string/type_movie"
+                android:overScrollMode="always"
+                android:textColor="@android:color/background_light"
+                android:textColorHint="@android:color/background_light" />
+        </LinearLayout>
+
+
+    </android.support.design.widget.AppBarLayout>
+
+    <android.support.v7.widget.RecyclerView
+      android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <FrameLayout
         android:layout_width="match_parent"
